@@ -2,6 +2,7 @@ import requests
 import streamlit as st
 from dotenv import load_dotenv
 import os 
+import time
 
 load_dotenv()
 
@@ -11,7 +12,7 @@ FLOW_ID = st.secrets["FLOW_ID"]
 APPLICATION_TOKEN = st.secrets["APP_TOKEN"]
 ENDPOINT = "first_agent" # You can set a specific endpoint name in the flow settings
 
-
+@st.cache_resource
 def run_flow(message: str) -> dict:
     api_url = f"{BASE_API_URL}/lf/{LANGFLOW_ID}/api/v1/run/{ENDPOINT}"
 
@@ -22,8 +23,14 @@ def run_flow(message: str) -> dict:
     }
    
     headers = {"Authorization": "Bearer " + APPLICATION_TOKEN, "Content-Type": "application/json"}
-    response = requests.post(api_url, json=payload, headers=headers, verify=False)
+    response = requests.post(api_url, json=payload, headers=headers, verify=False, stream=True)
     return response.json()
+
+
+def stream_data(msg):
+    for word in msg.split(" "):
+        yield word + " "
+        time.sleep(0.03)
 
 def main():
     st.title("Chat Interface")
@@ -39,8 +46,9 @@ def main():
             with st.spinner("Running flow..."):
                 response = run_flow(message)
             
-            response = response["outputs"][0]["outputs"][0]["results"]["message"]["text"]
-            st.markdown(response)
+            response = stream_data(response["outputs"][0]["outputs"][0]["results"]["message"]["text"])
+            # response = stream_data(response)
+            st.write_stream(response)
         except Exception as e:
             st.error(str(e))
 
